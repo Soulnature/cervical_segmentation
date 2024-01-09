@@ -26,12 +26,11 @@ def  save_itk_img(filename,imag_array,img):
     sitk.WriteImage(processed_image, filename)
 
 def post_deal_mask(mask_m,area_threshold):
-    mask_m_=deal_multi_label(mask_m)
-    mask_m_=remove_small_nosie_lebel(mask_m_,area_threshold)
-    return mask_m_
+    mask_m=remove_small_nosie_lebel(mask_m,area_threshold)
+    mask_m,num_features=deal_multi_label(mask_m)
+    return mask_m,num_features
 
-
-def deal_multi_label(matrix):
+def deal_multi_label(matrix):  
     # Binarize the matrix: convert non-zero values to 1
     binary_matrix = (matrix > 0).astype(int)
     # Find connected components
@@ -51,7 +50,7 @@ def deal_multi_label(matrix):
         # Update the values within the connected component to the most frequent label
         for coord in coordinates:
             matrix[tuple(coord)] = most_frequent_label
-    return matrix
+    return matrix,num_features
 def remove_small_nosie_lebel(matrix,area_threshold):
     # Binarize the matrix: convert non-zero values to 1
     binary_matrix = (matrix > 0).astype(int)
@@ -72,22 +71,22 @@ def remove_small_nosie_lebel(matrix,area_threshold):
     # (i.e., where there is a labeled connected component)
     cleaned_matrix = matrix * (cleaned_labeled_array > 0)
     return cleaned_matrix
-
 def postprocessing_label_img(img_dir,mask_dir,save_dir,area_threshold):
     # list the all files
     all_files=os.listdir(img_dir)
-    for i in all_files:
-        img_f,img=load_itk_all(os.path.join(img_dir,i))
-        mask_f,mask=load_itk_all(os.path.join(mask_dir,i))
-        ###
+    for file_na in all_files:
+        print(file_na)
+        img_f,img=load_itk_all(os.path.join(img_dir,file_na))
+        mask_f,mask=load_itk_all(os.path.join(mask_dir,file_na))
+        ## data ##
         n_x,n_y,n_z=img_f.shape
-        extracted_layer=range(int(n_x/2-2),int(n_x/2+3))
-        # extrat the medium layers #
-        mask_m=mask_f[extracted_layer,::]
-        imag_m=img_f[extracted_layer,::]
-        ## deal the mask #
-        for i in range(mask_m.shape[0]):
-            mask_m[i,::]=post_deal_mask(mask_m[i,::],area_threshold)
-    # save the files in outputdir ##
-    save_itk_img(os.path.join(save_dir,'images/'+i),mask_m,mask)
-    save_itk_img(os.path.join(save_dir,'labels/'+i),imag_m,img)
+        mask_slice=[]
+        for i in range(img_f.shape[0]):
+            mask_f[i,::],num_fea=post_deal_mask(mask_f[i,::],area_threshold)
+            if num_fea>5:
+                mask_slice.append(i)
+        mask_m=mask_f[mask_slice,::]
+        imag_m=img_f[mask_slice,::]
+        # save the files in outputdir ##
+        save_itk_img(os.path.join(save_dir,'images/'+file_na),mask_m,mask)
+        save_itk_img(os.path.join(save_dir,'labels/'+file_na),imag_m,img)
